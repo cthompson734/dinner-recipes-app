@@ -95,51 +95,47 @@ if menu == "View Recipes":
             # ---------- EDIT ----------
             edit_key = f"edit_{recipe['name']}_{idx}"
 
-            # Track editing in session_state
+            # Initialize edit state
             if edit_key not in st.session_state:
                 st.session_state[edit_key] = False
 
+            # Toggle edit form
             if st.button("✏️ Edit Recipe", key=f"edit_btn_{edit_key}"):
                 st.session_state[edit_key] = True
 
-            # Show the form if editing
             if st.session_state[edit_key]:
                 with st.form(f"edit_form_{edit_key}"):
-                    name = st.text_input("Recipe Name", value=recipe['name'], key=f"name_{edit_key}")
+                    name = st.text_input("Recipe Name", value=recipe['name'])
                     category = st.selectbox(
                         "Category",
                         ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"],
-                        index=["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"].index(recipe['category']),
-                        key=f"category_{edit_key}"
+                        index=["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"].index(recipe['category'])
                     )
-                    signature = st.text_input("Family Signature", value=recipe.get("signature", "Unknown"), key=f"signature_{edit_key}")
-                    ingredients = st.text_area(
-                        "Ingredients (one per line or comma-separated)",
-                        value=", ".join(recipe["ingredients"]),
-                        key=f"ingredients_{edit_key}"
-                    )
-                    instructions = st.text_area("Instructions", value=recipe["instructions"], key=f"instructions_{edit_key}")
+                    signature = st.text_input("Family Signature", value=recipe.get("signature", "Unknown"))
+                    ingredients = st.text_area("Ingredients (one per line or comma-separated)", value=", ".join(recipe["ingredients"]))
+                    instructions = st.text_area("Instructions", value=recipe["instructions"])
 
-                    # Prep Time Inputs
-                    prep_hours = st.number_input("Prep Time Hours", min_value=0, value=recipe.get("prep_time",0)//60, key=f"prep_hours_{edit_key}")
-                    prep_minutes = st.number_input("Prep Time Minutes", min_value=0, max_value=59, value=recipe.get("prep_time",0)%60, key=f"prep_minutes_{edit_key}")
+                    # Prep Time
+                    prep_hours = st.number_input("Prep Time Hours", min_value=0, value=(recipe.get("prep_time") or 0)//60)
+                    prep_minutes = st.number_input("Prep Time Minutes", min_value=0, max_value=59, value=(recipe.get("prep_time") or 0)%60)
                     prep_time_total = prep_hours * 60 + prep_minutes
 
-                    # Cook Time Inputs
-                    cook_hours = st.number_input("Cook Time Hours", min_value=0, value=recipe.get("cook_time",0)//60, key=f"cook_hours_{edit_key}")
-                    cook_minutes = st.number_input("Cook Time Minutes", min_value=0, max_value=59, value=recipe.get("cook_time",0)%60, key=f"cook_minutes_{edit_key}")
+                    # Cook Time
+                    cook_hours = st.number_input("Cook Time Hours", min_value=0, value=(recipe.get("cook_time") or 0)//60)
+                    cook_minutes = st.number_input("Cook Time Minutes", min_value=0, max_value=59, value=(recipe.get("cook_time") or 0)%60)
                     cook_time_total = cook_hours * 60 + cook_minutes
 
-                    is_favorite = st.checkbox("⭐ Mark as Favorite", value=recipe.get("is_favorite", False), key=f"fav_{edit_key}")
+                    is_favorite = st.checkbox("⭐ Mark as Favorite", value=recipe.get("is_favorite", False))
 
                     submitted = st.form_submit_button("Save Changes")
                     if submitted:
+                        # Update recipe safely
                         recipe.update({
-                            "name": name,
+                            "name": name.strip() or recipe["name"],
                             "category": category,
                             "signature": signature.strip() or "Unknown",
                             "ingredients": [i.strip() for i in ingredients.replace("\n", ",").split(",") if i.strip()],
-                            "instructions": instructions,
+                            "instructions": instructions.strip() or recipe["instructions"],
                             "prep_time": prep_time_total,
                             "cook_time": cook_time_total,
                             "is_favorite": is_favorite
