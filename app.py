@@ -43,9 +43,8 @@ st.sidebar.subheader("Family Folder")
 family_members = sorted(set(r.get("family", "Unknown") for r in recipes))
 selected_family = st.sidebar.selectbox("Select Family Folder", ["All"] + family_members)
 
-st.sidebar.subheader("Menu")
-menu = st.sidebar.selectbox(
-    "Go to",
+menu = st.sidebar.radio(
+    "Menu",
     ["View Recipes", "Add Recipe", "Shopping List"]
 )
 
