@@ -1,11 +1,20 @@
 import streamlit as st
 import json
 from pathlib import Path
-from PIL import Image
+
+st.set_page_config(
+    page_title="Dinner Recipes",
+    page_icon="🍽️",
+    layout="centered",
+    initial_sidebar_state="auto",
+    menu_items={
+        "Get Help": None,
+        "Report a bug": None,
+        "About": None
+    }
+)
 
 DATA_FILE = Path("recipes.json")
-IMAGE_DIR = Path("recipe_images")
-IMAGE_DIR.mkdir(exist_ok=True)
 
 # ---------- Data Helpers ----------
 def load_recipes():
@@ -19,12 +28,6 @@ def save_recipes(recipes):
         json.dump(recipes, f, indent=4)
 
 # ---------- App Setup ----------
-st.set_page_config(
-    page_title="Dinner Recipe Organizer",
-    page_icon="🍽️",
-    layout="wide"
-)
-
 st.title("🍽️ Dinner Recipe App")
 
 recipes = load_recipes()
@@ -40,13 +43,8 @@ if menu == "View Recipes":
     st.subheader("📖 Your Recipes")
 
     search = st.text_input("🔍 Search recipes")
-
     categories = sorted(set(r["category"] for r in recipes))
-    selected_category = st.selectbox(
-        "Filter by Category",
-        ["All"] + categories
-    )
-
+    selected_category = st.selectbox("Filter by Category", ["All"] + categories)
     favorites_only = st.checkbox("⭐ Favorites only")
 
     for recipe in recipes:
@@ -54,17 +52,11 @@ if menu == "View Recipes":
             continue
         if selected_category != "All" and recipe["category"] != selected_category:
             continue
-        if favorites_only and not recipe["is_favorite"]:
+        if favorites_only and not recipe.get("is_favorite", False):
             continue
 
         with st.expander(f"{'⭐ ' if recipe.get('is_favorite', False) else ''}{recipe['name']}"):
             cols = st.columns([1, 2])
-
-            if recipe.get("image"):
-                image_path = IMAGE_DIR / recipe["image"]
-                if image_path.exists():
-                    cols[0].image(image_path, use_container_width=True)
-
             cols[1].markdown(f"**Category:** {recipe['category']}")
             cols[1].markdown(
                 f"⏱️ Prep: {recipe.get('prep_time', 0)} min | "
@@ -80,7 +72,6 @@ if menu == "View Recipes":
 
             # ---------- DELETE ----------
             st.divider()
-
             delete_key = f"delete_{recipe['name']}"
             confirm_key = f"confirm_{recipe['name']}"
 
@@ -89,11 +80,9 @@ if menu == "View Recipes":
 
             if st.session_state.get(confirm_key):
                 st.warning("⚠️ Are you sure? This cannot be undone.")
-
                 col1, col2 = st.columns(2)
                 if col1.button("❌ Cancel", key=f"cancel_{recipe['name']}"):
                     st.session_state[confirm_key] = False
-
                 if col2.button("✅ Yes, Delete", key=f"yes_{recipe['name']}"):
                     recipes.remove(recipe)
                     save_recipes(recipes)
@@ -112,15 +101,9 @@ elif menu == "Add Recipe":
         )
         ingredients = st.text_area("Ingredients (one per line)")
         instructions = st.text_area("Instructions")
-
         prep_time = st.number_input("Prep Time (minutes)", min_value=0)
         cook_time = st.number_input("Cook Time (minutes)", min_value=0)
         is_favorite = st.checkbox("⭐ Mark as Favorite")
-
-        image_file = st.file_uploader(
-            "Recipe Image",
-            type=["png", "jpg", "jpeg"]
-        )
 
         submitted = st.form_submit_button("Save Recipe")
 
@@ -128,12 +111,6 @@ elif menu == "Add Recipe":
             if not name.strip():
                 st.error("Recipe name is required.")
             else:
-                image_name = ""
-                if image_file:
-                    image_name = f"{name.replace(' ', '_').lower()}.jpg"
-                    with open(IMAGE_DIR / image_name, "wb") as f:
-                        f.write(image_file.getbuffer())
-
                 recipes.append({
                     "name": name,
                     "category": category,
@@ -141,10 +118,8 @@ elif menu == "Add Recipe":
                     "instructions": instructions,
                     "prep_time": prep_time,
                     "cook_time": cook_time,
-                    "is_favorite": is_favorite,
-                    "image": image_name
+                    "is_favorite": is_favorite
                 })
-
                 save_recipes(recipes)
                 st.success("Recipe saved! 🍲")
 
@@ -158,7 +133,6 @@ elif menu == "Shopping List":
     )
 
     shopping_items = []
-
     for recipe in recipes:
         if recipe["name"] in selected:
             shopping_items.extend(recipe["ingredients"])
