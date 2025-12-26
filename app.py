@@ -78,7 +78,6 @@ if menu == "View Recipes":
             # ---------- DELETE ----------
             delete_key = f"delete_{recipe['name']}_{idx}"
             confirm_key = f"confirm_{recipe['name']}_{idx}"
-            recipe_index = recipes.index(recipe)
 
             if st.button("🗑️ Delete Recipe", key=delete_key):
                 st.session_state[confirm_key] = True
@@ -86,18 +85,14 @@ if menu == "View Recipes":
             if st.session_state.get(confirm_key):
                 st.warning("⚠️ Are you sure? This cannot be undone.")
                 col1, col2 = st.columns(2)
-                if col1.button("❌ Cancel", key=f"cancel_{recipe_index}"):
+                if col1.button("❌ Cancel", key=f"cancel_{recipe['name']}_{idx}"):
                     st.session_state[confirm_key] = False
-                if col2.button("✅ Yes, Delete", key=f"yes_{recipe_index}"):
-                    # Remove from original list
-                    recipes.pop(recipe_index)
+                if col2.button("✅ Yes, Delete", key=f"yes_{recipe['name']}_{idx}"):
+                    recipes.remove(recipe)
                     save_recipes(recipes)
                     st.success("Recipe deleted")
-                    st.session_state[confirm_key] = False
-                    try:
-                        st.experimental_rerun()
-                    except Exception:
-                        pass
+                    # No st.experimental_rerun() needed
+                    st.session_state[confirm_key] = False  # reset confirmation
 
             # ---------- EDIT ----------
             edit_key = f"edit_{recipe['name']}_{idx}"
@@ -150,10 +145,10 @@ if menu == "View Recipes":
                         save_recipes(recipes)
                         st.success("Recipe updated!")
                         st.session_state[edit_key] = False
-                        try:
-                            st.experimental_rerun()
-                        except Exception:
-                            pass
+                        # try:
+                        #     st.experimental_rerun()
+                        # except Exception:
+                        #     pass
 
 
 
