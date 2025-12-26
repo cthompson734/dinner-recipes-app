@@ -32,13 +32,20 @@ st.title("🍽️ Dinner Recipe App")
 
 recipes = load_recipes()
 
-# ---------- Sidebar ----------
-# Family Folder Selector (top of sidebar)
-family_members = sorted(set(r.get("family", "Unknown") for r in recipes))
-selected_family = st.sidebar.selectbox("Family Folder", ["All"] + family_members)
+# Ensure all recipes have a family field
+for r in recipes:
+    if "family" not in r:
+        r["family"] = "Unknown"
+save_recipes(recipes)
 
-menu = st.sidebar.radio(
-    "Menu",
+# ---------- Sidebar ----------
+st.sidebar.subheader("Family Folder")
+family_members = sorted(set(r.get("family", "Unknown") for r in recipes))
+selected_family = st.sidebar.selectbox("Select Family Folder", ["All"] + family_members)
+
+st.sidebar.subheader("Menu")
+menu = st.sidebar.selectbox(
+    "Go to",
     ["View Recipes", "Add Recipe", "Shopping List"]
 )
 
@@ -57,7 +64,7 @@ if menu == "View Recipes":
     else:
         recipes_to_show = recipes
 
-    for i, recipe in enumerate(recipes_to_show):
+    for idx, recipe in enumerate(recipes_to_show):
         if search and search.lower() not in recipe["name"].lower():
             continue
         if selected_category != "All" and recipe["category"] != selected_category:
@@ -68,11 +75,8 @@ if menu == "View Recipes":
         with st.expander(f"{'⭐ ' if recipe.get('is_favorite', False) else ''}{recipe['name']}"):
             cols = st.columns([1, 2])
             cols[1].markdown(f"**Category:** {recipe['category']}")
-            cols[1].markdown(
-                f"⏱️ Prep: {recipe.get('prep_time', 0)} min | "
-                f"Cook: {recipe.get('cook_time', 0)} min"
-            )
             cols[1].markdown(f"**Family:** {recipe.get('family', 'Unknown')}")
+            cols[1].markdown(f"⏱️ Prep: {recipe.get('prep_time', 0)} min | Cook: {recipe.get('cook_time', 0)} min")
 
             st.markdown("### 🧾 Ingredients")
             for item in recipe["ingredients"]:
@@ -83,9 +87,9 @@ if menu == "View Recipes":
 
             # ---------- DELETE ----------
             st.divider()
-            delete_key = f"delete_{i}_{recipe['name']}"
-            confirm_key = f"confirm_{i}_{recipe['name']}"
-            edit_key = f"edit_{i}_{recipe['name']}"
+            delete_key = f"delete_{recipe['name']}_{idx}"
+            confirm_key = f"confirm_{recipe['name']}_{idx}"
+            edit_key = f"edit_{recipe['name']}_{idx}"
 
             if st.button("🗑️ Delete Recipe", key=delete_key):
                 st.session_state[confirm_key] = True
@@ -93,9 +97,9 @@ if menu == "View Recipes":
             if st.session_state.get(confirm_key):
                 st.warning("⚠️ Are you sure? This cannot be undone.")
                 col1, col2 = st.columns(2)
-                if col1.button("❌ Cancel", key=f"cancel_{i}_{recipe['name']}"):
+                if col1.button("❌ Cancel", key=f"cancel_{recipe['name']}_{idx}"):
                     st.session_state[confirm_key] = False
-                if col2.button("✅ Yes, Delete", key=f"yes_{i}_{recipe['name']}"):
+                if col2.button("✅ Yes, Delete", key=f"yes_{recipe['name']}_{idx}"):
                     recipes.remove(recipe)
                     save_recipes(recipes)
                     st.success("Recipe deleted")
@@ -103,7 +107,7 @@ if menu == "View Recipes":
 
             # ---------- EDIT ----------
             if st.button("✏️ Edit Recipe", key=edit_key):
-                with st.form(f"edit_form_{i}_{recipe['name']}"):
+                with st.form(f"edit_form_{recipe['name']}_{idx}"):
                     name = st.text_input("Recipe Name", value=recipe['name'])
                     category = st.selectbox(
                         "Category",
@@ -115,8 +119,9 @@ if menu == "View Recipes":
                         ["Rhodes", "Finneran", "Thompson"],
                         index=["Rhodes", "Finneran", "Thompson"].index(recipe.get("family", "Rhodes"))
                     )
-                    ingredients = st.text_area("Ingredients (one per line)", value="\n".join(recipe['ingredients']))
-                    instructions = st.text_area("Instructions", value=recipe['instructions'])
+                    ingredients = st.text_area("Ingredients (one per line or comma-separated)", 
+                                               value=", ".join(recipe["ingredients"]))
+                    instructions = st.text_area("Instructions", value=recipe["instructions"])
                     prep_time = st.number_input("Prep Time (minutes)", min_value=0, value=recipe.get("prep_time", 0))
                     cook_time = st.number_input("Cook Time (minutes)", min_value=0, value=recipe.get("cook_time", 0))
                     is_favorite = st.checkbox("⭐ Mark as Favorite", value=recipe.get("is_favorite", False))
@@ -127,7 +132,7 @@ if menu == "View Recipes":
                             "name": name,
                             "category": category,
                             "family": family_member,
-                            "ingredients": ingredients.splitlines(),
+                            "ingredients": [i.strip() for i in ingredients.replace("\n", ",").split(",") if i.strip()],
                             "instructions": instructions,
                             "prep_time": prep_time,
                             "cook_time": cook_time,
@@ -151,14 +156,13 @@ elif menu == "Add Recipe":
             "Family Folder",
             ["Rhodes", "Finneran", "Thompson"]
         )
-        ingredients = st.text_area("Ingredients (one per line)")
+        ingredients = st.text_area("Ingredients (one per line or comma-separated)")
         instructions = st.text_area("Instructions")
         prep_time = st.number_input("Prep Time (minutes)", min_value=0)
         cook_time = st.number_input("Cook Time (minutes)", min_value=0)
         is_favorite = st.checkbox("⭐ Mark as Favorite")
 
         submitted = st.form_submit_button("Save Recipe")
-
         if submitted:
             if not name.strip():
                 st.error("Recipe name is required.")
@@ -167,7 +171,7 @@ elif menu == "Add Recipe":
                     "name": name,
                     "category": category,
                     "family": family_member,
-                    "ingredients": ingredients.splitlines(),
+                    "ingredients": [i.strip() for i in ingredients.replace("\n", ",").split(",") if i.strip()],
                     "instructions": instructions,
                     "prep_time": prep_time,
                     "cook_time": cook_time,
