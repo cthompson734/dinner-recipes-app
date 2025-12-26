@@ -94,7 +94,10 @@ if menu == "View Recipes":
                     save_recipes(recipes)
                     st.success("Recipe deleted")
                     st.session_state[confirm_key] = False
-                    st.experimental_rerun()
+                    try:
+                        st.experimental_rerun()
+                    except Exception:
+                        pass
 
             # ---------- EDIT ----------
             edit_key = f"edit_{recipe['name']}_{idx}"
@@ -147,7 +150,10 @@ if menu == "View Recipes":
                         save_recipes(recipes)
                         st.success("Recipe updated!")
                         st.session_state[edit_key] = False
-                        st.experimental_rerun()
+                        try:
+                            st.experimental_rerun()
+                        except Exception:
+                            pass
 
 
 
