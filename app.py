@@ -33,6 +33,10 @@ st.title("🍽️ Dinner Recipe App")
 recipes = load_recipes()
 
 # ---------- Sidebar ----------
+# Family Folder Selector (top of sidebar)
+family_members = sorted(set(r.get("family", "Unknown") for r in recipes))
+selected_family = st.sidebar.selectbox("Family Folder", ["All"] + family_members)
+
 menu = st.sidebar.radio(
     "Menu",
     ["View Recipes", "Add Recipe", "Shopping List"]
@@ -47,7 +51,13 @@ if menu == "View Recipes":
     selected_category = st.selectbox("Filter by Category", ["All"] + categories)
     favorites_only = st.checkbox("⭐ Favorites only")
 
-    for recipe in recipes:
+    # Filter recipes by family
+    if selected_family != "All":
+        recipes_to_show = [r for r in recipes if r.get("family") == selected_family]
+    else:
+        recipes_to_show = recipes
+
+    for i, recipe in enumerate(recipes_to_show):
         if search and search.lower() not in recipe["name"].lower():
             continue
         if selected_category != "All" and recipe["category"] != selected_category:
@@ -62,6 +72,7 @@ if menu == "View Recipes":
                 f"⏱️ Prep: {recipe.get('prep_time', 0)} min | "
                 f"Cook: {recipe.get('cook_time', 0)} min"
             )
+            cols[1].markdown(f"**Family:** {recipe.get('family', 'Unknown')}")
 
             st.markdown("### 🧾 Ingredients")
             for item in recipe["ingredients"]:
@@ -72,8 +83,9 @@ if menu == "View Recipes":
 
             # ---------- DELETE ----------
             st.divider()
-            delete_key = f"delete_{recipe['name']}"
-            confirm_key = f"confirm_{recipe['name']}"
+            delete_key = f"delete_{i}_{recipe['name']}"
+            confirm_key = f"confirm_{i}_{recipe['name']}"
+            edit_key = f"edit_{i}_{recipe['name']}"
 
             if st.button("🗑️ Delete Recipe", key=delete_key):
                 st.session_state[confirm_key] = True
@@ -81,13 +93,49 @@ if menu == "View Recipes":
             if st.session_state.get(confirm_key):
                 st.warning("⚠️ Are you sure? This cannot be undone.")
                 col1, col2 = st.columns(2)
-                if col1.button("❌ Cancel", key=f"cancel_{recipe['name']}"):
+                if col1.button("❌ Cancel", key=f"cancel_{i}_{recipe['name']}"):
                     st.session_state[confirm_key] = False
-                if col2.button("✅ Yes, Delete", key=f"yes_{recipe['name']}"):
+                if col2.button("✅ Yes, Delete", key=f"yes_{i}_{recipe['name']}"):
                     recipes.remove(recipe)
                     save_recipes(recipes)
                     st.success("Recipe deleted")
-                    st.rerun()
+                    st.experimental_rerun()
+
+            # ---------- EDIT ----------
+            if st.button("✏️ Edit Recipe", key=edit_key):
+                with st.form(f"edit_form_{i}_{recipe['name']}"):
+                    name = st.text_input("Recipe Name", value=recipe['name'])
+                    category = st.selectbox(
+                        "Category",
+                        ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"],
+                        index=["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"].index(recipe['category'])
+                    )
+                    family_member = st.selectbox(
+                        "Family Folder",
+                        ["Rhodes", "Finneran", "Thompson"],
+                        index=["Rhodes", "Finneran", "Thompson"].index(recipe.get("family", "Rhodes"))
+                    )
+                    ingredients = st.text_area("Ingredients (one per line)", value="\n".join(recipe['ingredients']))
+                    instructions = st.text_area("Instructions", value=recipe['instructions'])
+                    prep_time = st.number_input("Prep Time (minutes)", min_value=0, value=recipe.get("prep_time", 0))
+                    cook_time = st.number_input("Cook Time (minutes)", min_value=0, value=recipe.get("cook_time", 0))
+                    is_favorite = st.checkbox("⭐ Mark as Favorite", value=recipe.get("is_favorite", False))
+
+                    submitted = st.form_submit_button("Save Changes")
+                    if submitted:
+                        recipe.update({
+                            "name": name,
+                            "category": category,
+                            "family": family_member,
+                            "ingredients": ingredients.splitlines(),
+                            "instructions": instructions,
+                            "prep_time": prep_time,
+                            "cook_time": cook_time,
+                            "is_favorite": is_favorite
+                        })
+                        save_recipes(recipes)
+                        st.success("Recipe updated!")
+                        st.experimental_rerun()
 
 # ---------- ADD RECIPE ----------
 elif menu == "Add Recipe":
@@ -98,6 +146,10 @@ elif menu == "Add Recipe":
         category = st.selectbox(
             "Category",
             ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"]
+        )
+        family_member = st.selectbox(
+            "Family Folder",
+            ["Rhodes", "Finneran", "Thompson"]
         )
         ingredients = st.text_area("Ingredients (one per line)")
         instructions = st.text_area("Instructions")
@@ -114,6 +166,7 @@ elif menu == "Add Recipe":
                 recipes.append({
                     "name": name,
                     "category": category,
+                    "family": family_member,
                     "ingredients": ingredients.splitlines(),
                     "instructions": instructions,
                     "prep_time": prep_time,
@@ -122,6 +175,30 @@ elif menu == "Add Recipe":
                 })
                 save_recipes(recipes)
                 st.success("Recipe saved! 🍲")
+
+# # ---------- WEEKLY PLANNER ----------
+# elif menu == "Weekly Planner":
+#     days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+
+#     st.subheader("📅 Weekly Recipe Planner")
+
+#     # Filter recipes by selected family
+#     if selected_family != "All":
+#         recipes_for_planner = [r for r in recipes if r.get("family") == selected_family]
+#     else:
+#         recipes_for_planner = recipes
+
+#     selected_recipes = {day: None for day in days}
+
+#     for day in days:
+#         selected_recipe = st.selectbox(f"{day}", options=["None"] + [r["name"] for r in recipes_for_planner])
+#         selected_recipes[day] = selected_recipe
+
+#     if st.button("Save Weekly Plan"):
+#         plan_file = Path(f"{selected_family}_weekly_plan.json")
+#         with open(plan_file, "w") as f:
+#             json.dump(selected_recipes, f, indent=4)
+#         st.success(f"Weekly plan saved for {selected_family}")
 
 # ---------- SHOPPING LIST ----------
 elif menu == "Shopping List":
