@@ -84,25 +84,64 @@ if menu == "View Recipes":
             st.markdown("### 📋 Instructions")
             st.write(recipe["instructions"])
 
-            # ---------- DELETE ----------
-            st.divider()
-            delete_key = f"delete_{recipe['name']}_{idx}"
-            confirm_key = f"confirm_{recipe['name']}_{idx}"
-            edit_key = f"edit_{recipe['name']}_{idx}"
+        # ---------- DELETE ----------
+        st.divider()
+        delete_key = f"delete_{recipe['name']}_{idx}"
+        confirm_key = f"confirm_{recipe['name']}_{idx}"
+        if st.button("🗑️ Delete Recipe", key=delete_key):
+            st.session_state[confirm_key] = True
 
-            if st.button("🗑️ Delete Recipe", key=delete_key):
-                st.session_state[confirm_key] = True
+        if st.session_state.get(confirm_key):
+            st.warning("⚠️ Are you sure? This cannot be undone.")
+            col1, col2 = st.columns(2)
+            if col1.button("❌ Cancel", key=f"cancel_{recipe['name']}_{idx}"):
+                st.session_state[confirm_key] = False
+            if col2.button("✅ Yes, Delete", key=f"yes_{recipe['name']}_{idx}"):
+                recipes.remove(recipe)
+                save_recipes(recipes)
+                st.success("Recipe deleted")
+                st.experimental_rerun()
 
-            if st.session_state.get(confirm_key):
-                st.warning("⚠️ Are you sure? This cannot be undone.")
-                col1, col2 = st.columns(2)
-                if col1.button("❌ Cancel", key=f"cancel_{recipe['name']}_{idx}"):
-                    st.session_state[confirm_key] = False
-                if col2.button("✅ Yes, Delete", key=f"yes_{recipe['name']}_{idx}"):
-                    recipes.remove(recipe)
+        # ---------- EDIT ----------
+        edit_key = f"edit_{recipe['name']}_{idx}"  # <--- define edit_key here
+        if st.button("✏️ Edit Recipe", key=edit_key):
+            with st.form(f"edit_form_{recipe['name']}_{idx}"):
+                name = st.text_input("Recipe Name", value=recipe['name'])
+                category = st.selectbox(
+                    "Category",
+                    ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"],
+                    index=["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"].index(recipe['category'])
+                )
+                family_member = st.selectbox(
+                    "Family Folder",
+                    ["Rhodes", "Finneran", "Thompson"],
+                    index=["Rhodes", "Finneran", "Thompson"].index(recipe.get("family", "Rhodes"))
+                )
+                ingredients = st.text_area(
+                    "Ingredients (one per line or comma-separated)",
+                    value=", ".join(recipe["ingredients"])
+                )
+                instructions = st.text_area("Instructions", value=recipe["instructions"])
+                prep_time = st.number_input("Prep Time (minutes)", min_value=0, value=recipe.get("prep_time", 0))
+                cook_time = st.number_input("Cook Time (minutes)", min_value=0, value=recipe.get("cook_time", 0))
+                is_favorite = st.checkbox("⭐ Mark as Favorite", value=recipe.get("is_favorite", False))
+
+                submitted = st.form_submit_button("Save Changes")
+                if submitted:
+                    recipe.update({
+                        "name": name,
+                        "category": category,
+                        "family": family_member,
+                        "ingredients": [i.strip() for i in ingredients.replace("\n", ",").split(",") if i.strip()],
+                        "instructions": instructions,
+                        "prep_time": prep_time,
+                        "cook_time": cook_time,
+                        "is_favorite": is_favorite
+                    })
                     save_recipes(recipes)
-                    st.success("Recipe deleted")
+                    st.success("Recipe updated!")
                     st.experimental_rerun()
+
 
             # ---------- EDIT ----------
             if st.button("✏️ Edit Recipe", key=edit_key):
