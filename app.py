@@ -35,13 +35,13 @@ recipes = load_recipes()
 # Ensure all recipes have a family field
 for r in recipes:
     if "family" not in r:
-        r["family"] = "Unknown"
+        r["family"] = "Other"
 save_recipes(recipes)
 
 # ---------- Sidebar ----------
 st.sidebar.subheader("Family Folder")
-family_members = sorted(set(r.get("family", "Unknown") for r in recipes))
-selected_family = st.sidebar.selectbox("Select Family Folder", ["All"] + family_members)
+# family_members = sorted(set(r.get("family", "Other") for r in recipes))
+# selected_family = st.sidebar.selectbox("Select Family Folder", ["All"] + family_members)
 
 menu = st.sidebar.radio(
     "Menu",
@@ -57,11 +57,13 @@ if menu == "View Recipes":
     selected_category = st.selectbox("Filter by Category", ["All"] + categories)
     favorites_only = st.checkbox("⭐ Favorites only")
 
-    # Filter recipes by family
-    if selected_family != "All":
-        recipes_to_show = [r for r in recipes if r.get("family") == selected_family]
-    else:
-        recipes_to_show = recipes
+    # Signature filter
+    signatures = sorted(set(r.get("signature", "Unknown") for r in recipes))
+    selected_signature = st.selectbox("Filter by Family Signature", ["All"] + signatures)
+
+    recipes_to_show = recipes
+    if selected_signature != "All":
+        recipes_to_show = [r for r in recipes if r.get("signature") == selected_signature]
 
     for idx, recipe in enumerate(recipes_to_show):
         if search and search.lower() not in recipe["name"].lower():
@@ -72,15 +74,13 @@ if menu == "View Recipes":
             continue
 
         with st.expander(f"{'⭐ ' if recipe.get('is_favorite', False) else ''}{recipe['name']}"):
-            cols = st.columns([1, 2])
-            cols[1].markdown(f"**Category:** {recipe['category']}")
-            cols[1].markdown(f"**Family:** {recipe.get('family', 'Unknown')}")
-            cols[1].markdown(f"⏱️ Prep: {recipe.get('prep_time', 0)} min | Cook: {recipe.get('cook_time', 0)} min")
-
+            st.markdown(f"**Category:** {recipe['category']}")
+            st.markdown(f"**Family Signature:** {recipe.get('signature', 'Unknown')}")
+            st.markdown(f"⏱️ Prep: {recipe.get('prep_time', 0)} min | Cook: {recipe.get('cook_time', 0)} min")
+            
             st.markdown("### 🧾 Ingredients")
             for item in recipe["ingredients"]:
                 st.write(f"- {item}")
-
             st.markdown("### 📋 Instructions")
             st.write(recipe["instructions"])
 
@@ -113,18 +113,23 @@ if menu == "View Recipes":
                         ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"],
                         index=["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"].index(recipe['category'])
                     )
-                    family_member = st.selectbox(
-                        "Family Folder",
-                        ["Rhodes", "Finneran", "Thompson"],
-                        index=["Rhodes", "Finneran", "Thompson"].index(recipe.get("family", "Rhodes"))
-                    )
+                    signature = st.text_input("Family Signature", value=recipe.get("signature", "Unknown"))
                     ingredients = st.text_area(
                         "Ingredients (one per line or comma-separated)",
                         value=", ".join(recipe["ingredients"])
                     )
                     instructions = st.text_area("Instructions", value=recipe["instructions"])
-                    prep_time = st.number_input("Prep Time (minutes)", min_value=0, value=recipe.get("prep_time", 0))
-                    cook_time = st.number_input("Cook Time (minutes)", min_value=0, value=recipe.get("cook_time", 0))
+
+                    # Prep Time Inputs
+                    prep_hours = st.number_input("Prep Time Hours", min_value=0, value=recipe.get("prep_time",0)//60)
+                    prep_minutes = st.number_input("Prep Time Minutes", min_value=0, max_value=59, value=recipe.get("prep_time",0)%60)
+                    prep_time_total = prep_hours * 60 + prep_minutes
+
+                    # Cook Time Inputs
+                    cook_hours = st.number_input("Cook Time Hours", min_value=0, value=recipe.get("cook_time",0)//60)
+                    cook_minutes = st.number_input("Cook Time Minutes", min_value=0, max_value=59, value=recipe.get("cook_time",0)%60)
+                    cook_time_total = cook_hours * 60 + cook_minutes
+
                     is_favorite = st.checkbox("⭐ Mark as Favorite", value=recipe.get("is_favorite", False))
 
                     submitted = st.form_submit_button("Save Changes")
@@ -132,11 +137,11 @@ if menu == "View Recipes":
                         recipe.update({
                             "name": name,
                             "category": category,
-                            "family": family_member,
+                            "signature": signature.strip() or "Unknown",
                             "ingredients": [i.strip() for i in ingredients.replace("\n", ",").split(",") if i.strip()],
                             "instructions": instructions,
-                            "prep_time": prep_time,
-                            "cook_time": cook_time,
+                            "prep_time": prep_time_total,
+                            "cook_time": cook_time_total,
                             "is_favorite": is_favorite
                         })
                         save_recipes(recipes)
@@ -154,14 +159,20 @@ elif menu == "Add Recipe":
             "Category",
             ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"]
         )
-        family_member = st.selectbox(
-            "Family Folder",
-            ["Rhodes", "Finneran", "Thompson"]
-        )
+        signature = st.text_input("Family Signature (who owns this recipe)")
         ingredients = st.text_area("Ingredients (one per line or comma-separated)")
         instructions = st.text_area("Instructions")
-        prep_time = st.number_input("Prep Time (minutes)", min_value=0)
-        cook_time = st.number_input("Cook Time (minutes)", min_value=0)
+
+        # Prep Time Inputs
+        prep_hours = st.number_input("Prep Time Hours", min_value=0)
+        prep_minutes = st.number_input("Prep Time Minutes", min_value=0, max_value=59)
+        prep_time_total = prep_hours * 60 + prep_minutes
+
+        # Cook Time Inputs
+        cook_hours = st.number_input("Cook Time Hours", min_value=0)
+        cook_minutes = st.number_input("Cook Time Minutes", min_value=0, max_value=59)
+        cook_time_total = cook_hours * 60 + cook_minutes
+
         is_favorite = st.checkbox("⭐ Mark as Favorite")
 
         submitted = st.form_submit_button("Save Recipe")
@@ -172,15 +183,16 @@ elif menu == "Add Recipe":
                 recipes.append({
                     "name": name,
                     "category": category,
-                    "family": family_member,
+                    "signature": signature.strip() or "Unknown",
                     "ingredients": [i.strip() for i in ingredients.replace("\n", ",").split(",") if i.strip()],
                     "instructions": instructions,
-                    "prep_time": prep_time,
-                    "cook_time": cook_time,
+                    "prep_time": prep_time_total,
+                    "cook_time": cook_time_total,
                     "is_favorite": is_favorite
                 })
                 save_recipes(recipes)
                 st.success("Recipe saved! 🍲")
+
 
 # # ---------- WEEKLY PLANNER ----------
 # elif menu == "Weekly Planner":
