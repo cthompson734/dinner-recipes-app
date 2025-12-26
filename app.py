@@ -78,18 +78,22 @@ if menu == "View Recipes":
             # ---------- DELETE ----------
             delete_key = f"delete_{recipe['name']}_{idx}"
             confirm_key = f"confirm_{recipe['name']}_{idx}"
+            recipe_index = recipes.index(recipe)
+
             if st.button("🗑️ Delete Recipe", key=delete_key):
                 st.session_state[confirm_key] = True
 
             if st.session_state.get(confirm_key):
                 st.warning("⚠️ Are you sure? This cannot be undone.")
                 col1, col2 = st.columns(2)
-                if col1.button("❌ Cancel", key=f"cancel_{recipe['name']}_{idx}"):
+                if col1.button("❌ Cancel", key=f"cancel_{recipe_index}"):
                     st.session_state[confirm_key] = False
-                if col2.button("✅ Yes, Delete", key=f"yes_{recipe['name']}_{idx}"):
-                    recipes.remove(recipe)
+                if col2.button("✅ Yes, Delete", key=f"yes_{recipe_index}"):
+                    # Remove from original list
+                    recipes.pop(recipe_index)
                     save_recipes(recipes)
                     st.success("Recipe deleted")
+                    st.session_state[confirm_key] = False
                     st.experimental_rerun()
 
             # ---------- EDIT ----------
