@@ -25,7 +25,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🍽️ Dinner Recipe Organizer")
+st.title("🍽️ Dinner Recipe App")
 
 recipes = load_recipes()
 
@@ -57,16 +57,19 @@ if menu == "View Recipes":
         if favorites_only and not recipe["is_favorite"]:
             continue
 
-        with st.expander(f"{'⭐ ' if recipe['is_favorite'] else ''}{recipe['name']}"):
+        with st.expander(f"{'⭐ ' if recipe.get('is_favorite', False) else ''}{recipe['name']}"):
             cols = st.columns([1, 2])
 
-            if recipe["image"]:
+            if recipe.get("image"):
                 image_path = IMAGE_DIR / recipe["image"]
                 if image_path.exists():
-                    cols[0].image(Image.open(image_path), use_container_width=True)
+                    cols[0].image(image_path, use_container_width=True)
 
             cols[1].markdown(f"**Category:** {recipe['category']}")
-            cols[1].markdown(f"⏱️ Prep: {recipe['prep_time']} min | Cook: {recipe['cook_time']} min")
+            cols[1].markdown(
+                f"⏱️ Prep: {recipe.get('prep_time', 0)} min | "
+                f"Cook: {recipe.get('cook_time', 0)} min"
+            )
 
             st.markdown("### 🧾 Ingredients")
             for item in recipe["ingredients"]:
@@ -74,6 +77,28 @@ if menu == "View Recipes":
 
             st.markdown("### 📋 Instructions")
             st.write(recipe["instructions"])
+
+            # ---------- DELETE ----------
+            st.divider()
+
+            delete_key = f"delete_{recipe['name']}"
+            confirm_key = f"confirm_{recipe['name']}"
+
+            if st.button("🗑️ Delete Recipe", key=delete_key):
+                st.session_state[confirm_key] = True
+
+            if st.session_state.get(confirm_key):
+                st.warning("⚠️ Are you sure? This cannot be undone.")
+
+                col1, col2 = st.columns(2)
+                if col1.button("❌ Cancel", key=f"cancel_{recipe['name']}"):
+                    st.session_state[confirm_key] = False
+
+                if col2.button("✅ Yes, Delete", key=f"yes_{recipe['name']}"):
+                    recipes.remove(recipe)
+                    save_recipes(recipes)
+                    st.success("Recipe deleted")
+                    st.rerun()
 
 # ---------- ADD RECIPE ----------
 elif menu == "Add Recipe":
