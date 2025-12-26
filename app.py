@@ -32,17 +32,6 @@ st.title("🍽️ Dinner Recipe App")
 
 recipes = load_recipes()
 
-# Ensure all recipes have a family field
-for r in recipes:
-    if "family" not in r:
-        r["family"] = "Other"
-save_recipes(recipes)
-
-# ---------- Sidebar ----------
-st.sidebar.subheader("Family Folder")
-# family_members = sorted(set(r.get("family", "Other") for r in recipes))
-# selected_family = st.sidebar.selectbox("Select Family Folder", ["All"] + family_members)
-
 menu = st.sidebar.radio(
     "Menu",
     ["View Recipes", "Add Recipe", "Shopping List"]
@@ -105,32 +94,43 @@ if menu == "View Recipes":
 
             # ---------- EDIT ----------
             edit_key = f"edit_{recipe['name']}_{idx}"
-            if st.button("✏️ Edit Recipe", key=edit_key):
-                with st.form(f"edit_form_{recipe['name']}_{idx}"):
-                    name = st.text_input("Recipe Name", value=recipe['name'])
+
+            # Track editing in session_state
+            if edit_key not in st.session_state:
+                st.session_state[edit_key] = False
+
+            if st.button("✏️ Edit Recipe", key=f"edit_btn_{edit_key}"):
+                st.session_state[edit_key] = True
+
+            # Show the form if editing
+            if st.session_state[edit_key]:
+                with st.form(f"edit_form_{edit_key}"):
+                    name = st.text_input("Recipe Name", value=recipe['name'], key=f"name_{edit_key}")
                     category = st.selectbox(
                         "Category",
                         ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"],
-                        index=["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"].index(recipe['category'])
+                        index=["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"].index(recipe['category']),
+                        key=f"category_{edit_key}"
                     )
-                    signature = st.text_input("Family Signature", value=recipe.get("signature", "Unknown"))
+                    signature = st.text_input("Family Signature", value=recipe.get("signature", "Unknown"), key=f"signature_{edit_key}")
                     ingredients = st.text_area(
                         "Ingredients (one per line or comma-separated)",
-                        value=", ".join(recipe["ingredients"])
+                        value=", ".join(recipe["ingredients"]),
+                        key=f"ingredients_{edit_key}"
                     )
-                    instructions = st.text_area("Instructions", value=recipe["instructions"])
+                    instructions = st.text_area("Instructions", value=recipe["instructions"], key=f"instructions_{edit_key}")
 
                     # Prep Time Inputs
-                    prep_hours = st.number_input("Prep Time Hours", min_value=0, value=recipe.get("prep_time",0)//60)
-                    prep_minutes = st.number_input("Prep Time Minutes", min_value=0, max_value=59, value=recipe.get("prep_time",0)%60)
+                    prep_hours = st.number_input("Prep Time Hours", min_value=0, value=recipe.get("prep_time",0)//60, key=f"prep_hours_{edit_key}")
+                    prep_minutes = st.number_input("Prep Time Minutes", min_value=0, max_value=59, value=recipe.get("prep_time",0)%60, key=f"prep_minutes_{edit_key}")
                     prep_time_total = prep_hours * 60 + prep_minutes
 
                     # Cook Time Inputs
-                    cook_hours = st.number_input("Cook Time Hours", min_value=0, value=recipe.get("cook_time",0)//60)
-                    cook_minutes = st.number_input("Cook Time Minutes", min_value=0, max_value=59, value=recipe.get("cook_time",0)%60)
+                    cook_hours = st.number_input("Cook Time Hours", min_value=0, value=recipe.get("cook_time",0)//60, key=f"cook_hours_{edit_key}")
+                    cook_minutes = st.number_input("Cook Time Minutes", min_value=0, max_value=59, value=recipe.get("cook_time",0)%60, key=f"cook_minutes_{edit_key}")
                     cook_time_total = cook_hours * 60 + cook_minutes
 
-                    is_favorite = st.checkbox("⭐ Mark as Favorite", value=recipe.get("is_favorite", False))
+                    is_favorite = st.checkbox("⭐ Mark as Favorite", value=recipe.get("is_favorite", False), key=f"fav_{edit_key}")
 
                     submitted = st.form_submit_button("Save Changes")
                     if submitted:
@@ -146,7 +146,9 @@ if menu == "View Recipes":
                         })
                         save_recipes(recipes)
                         st.success("Recipe updated!")
+                        st.session_state[edit_key] = False
                         st.experimental_rerun()
+
 
 
 # ---------- ADD RECIPE ----------
