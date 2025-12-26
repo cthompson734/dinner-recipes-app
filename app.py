@@ -195,31 +195,6 @@ elif menu == "Add Recipe":
                 save_recipes(recipes)
                 st.success("Recipe saved! 🍲")
 
-
-# # ---------- WEEKLY PLANNER ----------
-# elif menu == "Weekly Planner":
-#     days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
-
-#     st.subheader("📅 Weekly Recipe Planner")
-
-#     # Filter recipes by selected family
-#     if selected_family != "All":
-#         recipes_for_planner = [r for r in recipes if r.get("family") == selected_family]
-#     else:
-#         recipes_for_planner = recipes
-
-#     selected_recipes = {day: None for day in days}
-
-#     for day in days:
-#         selected_recipe = st.selectbox(f"{day}", options=["None"] + [r["name"] for r in recipes_for_planner])
-#         selected_recipes[day] = selected_recipe
-
-#     if st.button("Save Weekly Plan"):
-#         plan_file = Path(f"{selected_family}_weekly_plan.json")
-#         with open(plan_file, "w") as f:
-#             json.dump(selected_recipes, f, indent=4)
-#         st.success(f"Weekly plan saved for {selected_family}")
-
 # ---------- SHOPPING LIST ----------
 elif menu == "Shopping List":
     st.subheader("🛒 Generate Shopping List")
