@@ -9,7 +9,9 @@ st.set_page_config(
     menu_items={"Get Help": None, "Report a bug": None, "About": None},
 )
 
-st.title("🍽️ Dinner Recipe App")
+# st.title("🍽️ Dinner Recipe App")
+
+
 
 def is_logged_in():
     return (
@@ -39,26 +41,27 @@ with st.sidebar:
                     except Exception as e:
                         st.error(f"Login failed: {e}")
 
-        with tab_signup:
-            with st.form("signup_form", clear_on_submit=False):
-                email2 = st.text_input("Email", key="signup_email")
-                password2 = st.text_input("Password", type="password", key="signup_password")
-                submitted2 = st.form_submit_button("Create account")
+            with tab_signup:
+                with st.form("signup_form", clear_on_submit=False):
+                    email2 = st.text_input("Email", key="signup_email")
+                    password2 = st.text_input("Password", type="password", key="signup_password")
+                    submitted2 = st.form_submit_button("Create account")
 
-                if submitted2:
-                    try:
-                        auth_sign_up(email2, password2)
-                        st.success("Account created! Now go to Log in.")
-                    except Exception as e:
-                        st.error(f"Signup failed: {e}")
+                    if submitted2:
+                        try:
+                            auth_sign_up(email2, password2)
+                            st.success("Account created! Now go to Log in.")
+                        except Exception as e:
+                            st.error(f"Signup failed: {e}")
 
-        st.stop()  # ⛔ stop the app until logged in
+            # ⛔ STOP HERE if not logged in
+            st.warning("Please log in to access the app.")
+            st.stop()
 
     else:
         st.success("Logged in ✅")
         if st.button("Log out"):
-            st.session_state.pop("sb_access_token", None)
-            st.session_state.pop("sb_refresh_token", None)
+            st.session_state.clear()
             st.rerun()
 
 def fetch_recipes():
