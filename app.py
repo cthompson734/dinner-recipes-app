@@ -1,5 +1,5 @@
 import streamlit as st
-from db import auth_sign_in, auth_sign_up, get_recipes, add_recipe, update_recipe, delete_recipe
+from db import auth_sign_in, auth_sign_up, get_recipes, add_recipe, update_recipe, delete_recipe, get_photo_recipes, add_photo_recipe, upload_photo_recipe_image, delete_photo_recipe, delete_photo_recipe_image
 import urllib.parse
 
 st.set_page_config(
@@ -11,8 +11,6 @@ st.set_page_config(
 )
 
 # st.title("🍽️ Dinner Recipe App")
-
-
 
 def is_logged_in():
     return (
@@ -65,12 +63,12 @@ with st.sidebar:
             st.session_state.clear()
             st.rerun()
 
-def fetch_recipes():
-    return get_recipes(
-        st.session_state["sb_access_token"],
-        st.session_state["sb_refresh_token"],
-    )
-recipes = fetch_recipes()
+# def fetch_recipes():
+#     return get_recipes(
+#         st.session_state["sb_access_token"],
+#         st.session_state["sb_refresh_token"],
+#     )
+# recipes = fetch_recipes()
 
 
 # ---------- Helpers ----------
@@ -158,8 +156,9 @@ recipes = get_recipes(
     st.session_state["sb_refresh_token"]
 )
 
+
 # ---------- Sidebar ----------
-menu = st.sidebar.radio("Menu", ["View Recipes", "Add Recipe", "Shopping List", "Version Changes & Updates"])
+menu = st.sidebar.radio("Menu", ["View Recipes", "Add Recipe", "Shopping List", "Photo Recipes", "Version Changes & Updates"])
 
 
 # ---------- VIEW RECIPES ----------
@@ -471,224 +470,95 @@ elif menu == "Version Changes & Updates":
     st.write("- Share recipes with family members")
     st.write("- Weekly meal planner")
 
+# ---------- RECIPE PHOTOS SECTION ----------
+elif menu == "Photo Recipes":
+    st.subheader("📸 Photo Recipes")
+    st.caption("Upload a photo of a recipe and save it for later.")
 
+    # --- Upload form ---
+    label = st.text_input(
+        "Recipe name / label",
+        placeholder="e.g., Sarah's Awesome Cookies",
+        key="photo_label",
+    )
 
-# import streamlit as st
-# import json
-# from pathlib import Path
+    uploaded = st.file_uploader(
+        "Upload a recipe photo (jpg/png/webp)",
+        type=["jpg", "jpeg", "png", "webp"],
+        key="photo_upload",
+    )
 
-# st.set_page_config(
-#     page_title="Dinner Recipes",
-#     page_icon="🍽️",
-#     layout="centered",
-#     initial_sidebar_state="auto",
-#     menu_items={
-#         "Get Help": None,
-#         "Report a bug": None,
-#         "About": None
-#     }
-# )
+    if uploaded is not None:
+        st.image(uploaded, caption="Preview", use_container_width=True)
 
-# DATA_FILE = Path("recipes.json")
+    if st.button(" Save Photo Recipe", key="save_photo_recipe"):
+        if not label.strip():
+            st.error("Please enter a name/label.")
+            st.stop()
+        if uploaded is None:
+            st.error("Please upload a photo.")
+            st.stop()
 
-# # ---------- Data Helpers ----------
-# def load_recipes():
-#     if DATA_FILE.exists():
-#         with open(DATA_FILE, "r") as f:
-#             return json.load(f)
-#     return []
+        file_ext = uploaded.name.split(".")[-1].lower().replace("jpeg", "jpg")
+        content_type = uploaded.type or "image/jpeg"
+        file_bytes = uploaded.getvalue()
 
-# def save_recipes(recipes):
-#     with open(DATA_FILE, "w") as f:
-#         json.dump(recipes, f, indent=4)
+        # IMPORTANT: Make sure this uploads to your *photo* bucket
+        path, url = upload_photo_recipe_image(
+            st.session_state["sb_access_token"],
+            st.session_state["sb_refresh_token"],
+            file_bytes,
+            content_type,
+            file_ext,
+        )
 
-# # ---------- App Setup ----------
-# st.title("🍽️ Dinner Recipe App")
+        add_photo_recipe(
+            st.session_state["sb_access_token"],
+            st.session_state["sb_refresh_token"],
+            label.strip(),
+            url, path
+            # optional: store path too if your table has image_path
+            # path,
+        )
 
-# # recipes = load_recipes()
+        st.success("Saved! ✅")
+        safe_rerun()
 
-# from db import get_recipes, add_recipe, update_recipe, delete_recipe
-# recipes = get_recipes()
+    st.divider()
 
-# menu = st.sidebar.radio(
-#     "Menu",
-#     ["View Recipes", "Add Recipe", "Shopping List"]
-# )
+    # --- List saved photo recipes ---
+    photos = get_photo_recipes(
+    st.session_state["sb_access_token"],
+    st.session_state["sb_refresh_token"],
+    )
 
-# # ---------- VIEW RECIPES ----------
-# if menu == "View Recipes":
-#     st.subheader("📖 Your Recipes")
+    if not photos:
+        st.info("No photo recipes yet.")
+    else:
+        st.markdown("### Saved Photo Recipes")
 
-#     search = st.text_input("🔍 Search recipes")
-#     categories = sorted(set(r["category"] for r in recipes))
-#     selected_category = st.selectbox("Filter by Category", ["All"] + categories)
-#     favorites_only = st.checkbox("⭐ Favorites only")
+        for p in photos:
+            label_txt = str(p.get("label") or "(No label)")
+            created_txt = str(p.get("created_at") or "")
+            exp_label = f"🖼️ {label_txt} — {created_txt}"
 
-#     # Signature filter
-#     signatures = sorted(set(r.get("signature", "Unknown") for r in recipes))
-#     selected_signature = st.selectbox("Filter by Family Signature", ["All"] + signatures)
+            with st.expander(exp_label, expanded=False):
+                st.image(p["image_url"], use_container_width=True)
 
-#     recipes_to_show = recipes
-#     if selected_signature != "All":
-#         recipes_to_show = [r for r in recipes if r.get("signature") == selected_signature]
+                if st.button("🗑️ Delete", key=f"del_photo_{p['id']}"):
+                    if p.get("image_path"):
+                        delete_photo_recipe_image(
+                            st.session_state["sb_access_token"],
+                            st.session_state["sb_refresh_token"],
+                            p["image_path"],
+                        )
 
-#     for idx, recipe in enumerate(recipes_to_show):
-#         if search and search.lower() not in recipe["name"].lower():
-#             continue
-#         if selected_category != "All" and recipe["category"] != selected_category:
-#             continue
-#         if favorites_only and not recipe.get("is_favorite", False):
-#             continue
+                    delete_photo_recipe(
+                        st.session_state["sb_access_token"],
+                        st.session_state["sb_refresh_token"],
+                        p["id"],
+                    )
 
-#         with st.expander(f"{'⭐ ' if recipe.get('is_favorite', False) else ''}{recipe['name']}"):
-#             st.markdown(f"**Category:** {recipe['category']}")
-#             st.markdown(f"**Family Signature:** {recipe.get('signature', 'Unknown')}")
-#             st.markdown(f"⏱️ Prep: {recipe.get('prep_time', 0)} min | Cook: {recipe.get('cook_time', 0)} min")
-            
-#             st.markdown("### 🧾 Ingredients")
-#             for item in recipe["ingredients"]:
-#                 st.write(f"- {item}")
-#             st.markdown("### 📋 Instructions")
-#             st.write(recipe["instructions"])
+                    st.success("Deleted.")
+                    safe_rerun()
 
-#             st.divider()
-
-#             # ---------- DELETE ----------
-#             delete_key = f"delete_{recipe['name']}_{idx}"
-#             confirm_key = f"confirm_{recipe['name']}_{idx}"
-
-#             if st.button("🗑️ Delete Recipe", key=delete_key):
-#                 st.session_state[confirm_key] = True
-
-#             if st.session_state.get(confirm_key):
-#                 st.warning("⚠️ Are you sure? This cannot be undone.")
-#                 col1, col2 = st.columns(2)
-#                 if col1.button("❌ Cancel", key=f"cancel_{recipe['name']}_{idx}"):
-#                     st.session_state[confirm_key] = False
-#                 if col2.button("✅ Yes, Delete", key=f"yes_{recipe['name']}_{idx}"):
-#                     recipes.remove(recipe)
-#                     save_recipes(recipes)
-#                     st.success("Recipe deleted")
-#                     # No st.experimental_rerun() needed
-#                     st.session_state[confirm_key] = False  # reset confirmation
-
-#             # ---------- EDIT ----------
-#             edit_key = f"edit_{recipe['name']}_{idx}"
-
-#             # Initialize edit state
-#             if edit_key not in st.session_state:
-#                 st.session_state[edit_key] = False
-
-#             # Toggle edit form
-#             if st.button("✏️ Edit Recipe", key=f"edit_btn_{edit_key}"):
-#                 st.session_state[edit_key] = True
-
-#             if st.session_state[edit_key]:
-#                 with st.form(f"edit_form_{edit_key}"):
-#                     name = st.text_input("Recipe Name", value=recipe['name'])
-#                     category = st.selectbox(
-#                         "Category",
-#                         ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"],
-#                         index=["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"].index(recipe['category'])
-#                     )
-#                     signature = st.text_input("Family Signature", value=recipe.get("signature", "Unknown"))
-#                     ingredients = st.text_area("Ingredients (one per line or comma-separated)", value=", ".join(recipe["ingredients"]))
-#                     instructions = st.text_area("Instructions", value=recipe["instructions"])
-
-#                     # Prep Time
-#                     prep_hours = st.number_input("Prep Time Hours", min_value=0, value=(recipe.get("prep_time") or 0)//60)
-#                     prep_minutes = st.number_input("Prep Time Minutes", min_value=0, max_value=59, value=(recipe.get("prep_time") or 0)%60)
-#                     prep_time_total = prep_hours * 60 + prep_minutes
-
-#                     # Cook Time
-#                     cook_hours = st.number_input("Cook Time Hours", min_value=0, value=(recipe.get("cook_time") or 0)//60)
-#                     cook_minutes = st.number_input("Cook Time Minutes", min_value=0, max_value=59, value=(recipe.get("cook_time") or 0)%60)
-#                     cook_time_total = cook_hours * 60 + cook_minutes
-
-#                     is_favorite = st.checkbox("⭐ Mark as Favorite", value=recipe.get("is_favorite", False))
-
-#                     submitted = st.form_submit_button("Save Changes")
-#                     if submitted:
-#                         # Update recipe safely
-#                         recipe.update({
-#                             "name": name.strip() or recipe["name"],
-#                             "category": category,
-#                             "signature": signature.strip() or "Unknown",
-#                             "ingredients": [i.strip() for i in ingredients.replace("\n", ",").split(",") if i.strip()],
-#                             "instructions": instructions.strip() or recipe["instructions"],
-#                             "prep_time": prep_time_total,
-#                             "cook_time": cook_time_total,
-#                             "is_favorite": is_favorite
-#                         })
-#                         save_recipes(recipes)
-#                         st.success("Recipe updated!")
-#                         st.session_state[edit_key] = False
-#                         # try:
-#                         #     st.experimental_rerun()
-#                         # except Exception:
-#                         #     pass
-
-
-
-# # ---------- ADD RECIPE ----------
-# elif menu == "Add Recipe":
-#     st.subheader("➕ Add a New Recipe")
-
-#     with st.form("add_recipe_form"):
-#         name = st.text_input("Recipe Name")
-#         category = st.selectbox(
-#             "Category",
-#             ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"]
-#         )
-#         signature = st.text_input("Family Signature (who owns this recipe)")
-#         ingredients = st.text_area("Ingredients (one per line or comma-separated)")
-#         instructions = st.text_area("Instructions")
-
-#         # Prep Time Inputs
-#         prep_hours = st.number_input("Prep Time Hours", min_value=0)
-#         prep_minutes = st.number_input("Prep Time Minutes", min_value=0, max_value=59)
-#         prep_time_total = prep_hours * 60 + prep_minutes
-
-#         # Cook Time Inputs
-#         cook_hours = st.number_input("Cook Time Hours", min_value=0)
-#         cook_minutes = st.number_input("Cook Time Minutes", min_value=0, max_value=59)
-#         cook_time_total = cook_hours * 60 + cook_minutes
-
-#         is_favorite = st.checkbox("⭐ Mark as Favorite")
-
-#         submitted = st.form_submit_button("Save Recipe")
-#         if submitted:
-#             if not name.strip():
-#                 st.error("Recipe name is required.")
-#             else:
-#                 recipes.append({
-#                     "name": name,
-#                     "category": category,
-#                     "signature": signature.strip() or "Unknown",
-#                     "ingredients": [i.strip() for i in ingredients.replace("\n", ",").split(",") if i.strip()],
-#                     "instructions": instructions,
-#                     "prep_time": prep_time_total,
-#                     "cook_time": cook_time_total,
-#                     "is_favorite": is_favorite
-#                 })
-#                 save_recipes(recipes)
-#                 st.success("Recipe saved! 🍲")
-
-# # ---------- SHOPPING LIST ----------
-# elif menu == "Shopping List":
-#     st.subheader("🛒 Generate Shopping List")
-
-#     selected = st.multiselect(
-#         "Select recipes",
-#         options=[r["name"] for r in recipes]
-#     )
-
-#     shopping_items = []
-#     for recipe in recipes:
-#         if recipe["name"] in selected:
-#             shopping_items.extend(recipe["ingredients"])
-
-#     if shopping_items:
-#         st.markdown("### 🧺 Shopping List")
-#         for item in sorted(set(shopping_items)):
-#             st.checkbox(item)
