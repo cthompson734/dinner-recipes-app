@@ -1,5 +1,6 @@
 import streamlit as st
 from db import auth_sign_in, auth_sign_up, get_recipes, add_recipe, update_recipe, delete_recipe
+import urllib.parse
 
 st.set_page_config(
     page_title="Dinner Recipes",
@@ -93,6 +94,47 @@ def show_flash_messages():
     if msg:
         st.success(msg)
 
+# for sharing over email 
+def build_share_email(recipe: dict) -> tuple[str, str]:
+    name = recipe.get("name", "(Unnamed Recipe)")
+    category = recipe.get("category", "Other")
+    signature = recipe.get("signature", "Unknown")
+
+    ing_list = recipe.get("ingredients") or []
+    if isinstance(ing_list, str):
+        ing_list = parse_ingredients(ing_list)
+
+    prep_h, prep_m = minutes_to_hm(recipe.get("prep_time"))
+    cook_h, cook_m = minutes_to_hm(recipe.get("cook_time"))
+
+    subject = f"Recipe: {name}"
+
+    body_lines = [
+        f"{name}",
+        "",
+        f"Category: {category}",
+        f"Family Signature: {signature}",
+        f"Prep: {prep_h}h {prep_m}m | Cook: {cook_h}h {cook_m}m",
+        "",
+        "Ingredients:",
+        *[f"- {i}" for i in ing_list],
+        "",
+        "Instructions:",
+        recipe.get("instructions", ""),
+        "",
+        "Sent from my Dinner Recipes app 🍽️",
+    ]
+
+    body = "\n".join(body_lines)
+    return subject, body
+
+def mailto_link(to_email: str, subject: str, body: str) -> str:
+    params = {
+        "subject": subject,
+        "body": body,
+    }
+    qs = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+    return f"mailto:{to_email}?{qs}"
 
 def minutes_to_hm(total_minutes: int | None) -> tuple[int, int]:
     total = int(total_minutes or 0)
@@ -117,7 +159,7 @@ recipes = get_recipes(
 )
 
 # ---------- Sidebar ----------
-menu = st.sidebar.radio("Menu", ["View Recipes", "Add Recipe", "Shopping List"])
+menu = st.sidebar.radio("Menu", ["View Recipes", "Add Recipe", "Shopping List", "Version Changes & Updates"])
 
 
 # ---------- VIEW RECIPES ----------
@@ -149,7 +191,11 @@ if menu == "View Recipes":
             continue
 
         recipe_id = recipe["id"]
-        exp_title = f"{'⭐ ' if recipe.get('is_favorite', False) else ''}{name or '(Unnamed Recipe)'}"
+        # exp_title = f"{'⭐ ' if recipe.get('is_favorite', False) else ''}{name or '(Unnamed Recipe)'}"
+        is_macro_friendly = recipe.get("category") == "Macro Friendly"
+        mf_tag = "🟢 MF " if is_macro_friendly else ""
+        fav_tag = "⭐ " if recipe.get("is_favorite", False) else ""
+        exp_title = f"{mf_tag}{fav_tag}{name or '(Unnamed Recipe)'}"
 
         with st.expander(exp_title):
             prep_h, prep_m = minutes_to_hm(recipe.get("prep_time"))
@@ -179,11 +225,30 @@ if menu == "View Recipes":
             st.divider()
 
             # Buttons row: Delete / Edit / Refresh
-            col_del, col_edit, col_ref = st.columns(3)
+            col_del, col_edit, col_share, col_ref = st.columns(4)
 
             # ---------- REFRESH ----------
             # if col_ref.button("🔄 Refresh", key=f"refresh_{recipe_id}"):
             #     safe_rerun()
+            # ---------- PRINT ----------
+            # print_html = recipe_to_print_html(recipe)
+            # col_print.download_button(
+            #     "🖨️ Print",
+            #     data=print_html,
+            #     file_name=f"{(name or 'recipe').replace(' ', '_')}.html",
+            #     mime="text/html",
+            #     key=f"print_{recipe_id}",
+            # )
+
+            to_email = st.text_input("Share to email", key=f"share_to_{recipe_id}", placeholder="name@example.com")
+
+            if col_share.button("📧 Share", key=f"share_btn_{recipe_id}"):
+                if not to_email.strip():
+                    st.error("Enter an email address first.")
+                else:
+                    subject, body = build_share_email(recipe)
+                    link = mailto_link(to_email.strip(), subject, body)
+                    st.markdown(f"[✅ Click here to open your email app and send]({link})")
 
             # ---------- DELETE ----------
             confirm_key = f"confirm_delete_{recipe_id}"
@@ -224,9 +289,9 @@ if menu == "View Recipes":
                     name_in = st.text_input("Recipe Name", value=recipe.get("name", ""))
                     category_in = st.selectbox(
                         "Category",
-                        ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"],
-                        index=["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"].index(
-                            recipe.get("category", "Other") if recipe.get("category") in ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"] else "Other"
+                        ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Macro Friendly","Desserts", "Other"],
+                        index=["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian","Macro Friendly","Desserts", "Other"].index(
+                            recipe.get("category", "Other") if recipe.get("category") in ["Chicken", "Beef", "Pasta", "Seafood","Macro Friendly","Desserts", "Vegetarian", "Other"] else "Other"
                         ),
                     )
                     signature_in = st.text_input("Family Signature", value=recipe.get("signature", "Unknown"))
@@ -280,7 +345,7 @@ elif menu == "Add Recipe":
         name = st.text_input("Recipe Name")
         category = st.selectbox(
             "Category",
-            ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian", "Other"],
+            ["Chicken", "Beef", "Pasta", "Seafood", "Vegetarian","Macro Friendly","Desserts", "Other"],
         )
         signature = st.text_input("Family Signature (who owns this recipe)")
         ingredients_text = st.text_area("Ingredients (one per line or comma-separated)")
@@ -339,6 +404,72 @@ elif menu == "Shopping List":
         st.markdown("### 🧺 Shopping List")
         for item in sorted(set(shopping_items)):
             st.checkbox(item)
+
+# ---------- NEWS & UPDATES ----------
+elif menu == "Version Changes & Updates":
+    st.subheader("📰 News & Version Updates")
+
+    st.caption("What’s new in the app, bug fixes, and upcoming changes.")
+
+    # Optional: show current version
+    APP_VERSION = "v0.6.0"
+    st.info(f"Current version: {APP_VERSION}")
+
+    # Simple changelog entries (newest first)
+    updates = [
+        {
+            "version": "v0.6.0",
+            "date": "2025-12-26",
+            "title": "Auth + Recipe CRUD polish",
+            "changes": [
+                "Improved login/logout flow",
+                "Recipe edit form now supports hours/minutes for prep/cook time",
+                "Delete confirmation added to prevent accidental deletes",
+            ],
+        },
+        {
+            "version": "v0.5.0",
+            "date": "2025-12-20",
+            "title": "Shopping List",
+            "changes": [
+                "Generate a shopping list from selected recipes",
+                "Deduped shopping items",
+            ],
+        },
+        {
+            "version": "v0.5.0",
+            "date": "2025-12-20",
+            "title": "Category",
+            "changes": [
+                "You can now add options for desert, and macro specific categories"
+                
+            ],
+        },
+        {
+            "version": "v0.5.0",
+            "date": "2025-12-20",
+            "title": "Added Share Functionality",
+            "changes": [
+                "You can now share recipes with other people natively using the Share feature.",
+                "Under the recipes list there is a button for (share) and an email send to list"
+                
+            ],
+        }
+        
+    ]
+
+    for u in updates:
+        with st.expander(f"{u['version']} — {u['title']} ({u['date']})", expanded=False):
+            for c in u["changes"]:
+                st.write(f"- {c}")
+
+    st.divider()
+
+    # Optional: small "roadmap" section
+    st.markdown("### 🧭 Coming soon")
+    st.write("- Recipe photo upload")
+    st.write("- Share recipes with family members")
+    st.write("- Weekly meal planner")
 
 
 
